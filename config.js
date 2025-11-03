@@ -3,6 +3,15 @@ window.CONFIG = {
   FORM_ENDPOINT: 'https://formsubmit.co/ajax/tech.transformation.mdst@gmail.com',
   VIDEO_BASE_URL: 'https://aiworkshopmediaset.s3.eu-west-1.amazonaws.com/video-genai/',
   sections: [
+    {
+      title: 'Ricostruzioni di cronaca generate da script',
+      contents: [
+        {
+          title: 'Beyond Jupiter Studios',
+          videos: [
+            { title: 'La strage di Erba', file: 'TestErba_BeyondJupiterStudios.mp4' }
+          ]
+        },
         {
           title: 'Reply Bitmama',
           videos: [
