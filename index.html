@@ -1,0 +1,2506 @@
+<!--
+README
+- Esegui in locale aprendo index.html in un browser moderno con config.js nella stessa cartella.
+- Pubblica su GitHub Pages effettuando il commit di index.html, config.js e links.html, facendo push sul branch principale e attivando GitHub Pages per quel branch o per la cartella /docs.
+- Configura videos, SURVEY_TITLE e FORM_ENDPOINT in config.js; aggiorna i valori in base al tuo progetto prima di condividere il questionario.
+- La coda offline salva le risposte non inviate per ogni sessione del partecipante in localStorage, ritenta automaticamente a ogni navigazione, quando la connessione torna attiva, e usa navigator.sendBeacon alla chiusura della scheda.
+- Condividi direttamente index.html con i partecipanti; non è richiesto alcun codice di accesso o parametro uid.
+
+Promemoria per la configurazione di Formsubmit
+- Crea un modulo su https://formsubmit.co ed usa l'endpoint in formato https://formsubmit.co/ajax/tua-email.
+- Incolla quell'URL in CONFIG.FORM_ENDPOINT dentro config.js. Formsubmit accetta richieste JSON quando l'header Accept è impostato su application/json.
+- Aggiungi dal pannello di Formsubmit le regole di notifica di cui hai bisogno.
+-->
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Questionario</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Geologica:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      color-scheme: dark;
+      font-family: 'Geologica', 'Inter', 'Segoe UI', system-ui, sans-serif;
+      font-size: 16px;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: radial-gradient(circle at top, #17202a 0%, #0b1118 55%, #05070a 100%);
+      color: #f5f7fa;
+      display: flex;
+      align-items: stretch;
+      justify-content: center;
+      padding: clamp(2rem, 4vw, 3.5rem) clamp(1rem, 3vw, 2.25rem) clamp(3rem, 6vw, 4.75rem);
+    }
+
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
+
+    #app {
+      width: 100%;
+      max-width: 1240px;
+      margin: 0 auto;
+    }
+
+    .card {
+      background: rgba(18, 24, 32, 0.9);
+      backdrop-filter: blur(8px);
+      border-radius: 16px;
+      padding: clamp(2.5rem, 2.5vw + 2rem, 3.25rem);
+      box-shadow: 0 20px 45px rgba(0, 0, 0, 0.35);
+      border: 1px solid rgba(90, 120, 150, 0.25);
+    }
+
+    h1, h2, h3 {
+      margin: 0;
+      line-height: 1.2;
+      letter-spacing: 0.02em;
+    }
+
+    h1 {
+      font-size: clamp(1.8rem, 2.2vw + 1rem, 2.6rem);
+      font-weight: 600;
+    }
+
+    h2 {
+      font-size: 1.35rem;
+      margin-bottom: 1rem;
+    }
+
+    p {
+      margin: 0 0 1rem;
+      line-height: 1.6;
+      color: #d9e2ef;
+    }
+
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      font-size: 0.75rem;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: #8ea3c7;
+    }
+
+    .welcome {
+      text-align: center;
+      max-width: 860px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: clamp(0.85rem, 2vh, 1.35rem);
+      padding-inline: clamp(0.25rem, 2vw, 1rem);
+    }
+
+    .welcome h1 {
+      margin-bottom: 0;
+    }
+
+    .welcome p {
+      margin: 0;
+      font-size: clamp(0.98rem, calc(1vw + 0.8rem), 1.05rem);
+      line-height: 1.6;
+      max-width: 620px;
+    }
+
+    .welcome button {
+      margin-top: 0;
+      align-self: center;
+    }
+
+    .welcome .status {
+      margin-top: clamp(0.6rem, 2vh, 0.9rem);
+    }
+
+    .welcome-overview {
+      width: 100%;
+      margin-top: clamp(1.8rem, 3.5vh, 2.8rem);
+      display: grid;
+      gap: clamp(1.1rem, 2vh, 1.6rem);
+    }
+
+    .overview-wrapper {
+      margin-top: clamp(0.8rem, 2vh, 1.2rem);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: clamp(1.1rem, 2vh, 1.6rem);
+      width: 100%;
+    }
+
+    .overview-master-toggle {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0;
+      background: none;
+      border: none;
+      border-radius: 0;
+      color: inherit;
+      cursor: pointer;
+      transition: none;
+    }
+
+    .overview-master-toggle:hover {
+      transform: none;
+      box-shadow: none;
+    }
+
+    .overview-master-toggle:hover .toggle-icon {
+      background: rgba(123, 208, 255, 0.12);
+    }
+
+    .overview-master-toggle:focus-visible {
+      outline: none;
+    }
+
+    .overview-master-toggle:focus-visible .toggle-icon {
+      outline: 3px solid rgba(108, 181, 255, 0.6);
+      outline-offset: 2px;
+    }
+
+    .overview-master-panel {
+      width: 100%;
+    }
+
+    .overview-master-panel .welcome-overview {
+      margin-top: 0;
+    }
+
+    .overview-section {
+      border-radius: 20px;
+      border: 1px solid rgba(120, 150, 200, 0.28);
+      background: linear-gradient(160deg, rgba(18, 26, 36, 0.92), rgba(9, 13, 20, 0.92));
+      overflow: hidden;
+      transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+    }
+
+    .overview-section[data-open="true"] {
+      border-color: rgba(123, 208, 255, 0.55);
+      box-shadow: 0 18px 40px rgba(16, 112, 195, 0.25);
+      transform: translateY(-2px);
+    }
+
+    .overview-toggle {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1.25rem;
+      width: 100%;
+      padding: 1.4rem 1.6rem;
+      background: transparent;
+      border: none;
+      color: inherit;
+      cursor: pointer;
+      text-align: left;
+      border-radius: 0;
+      min-width: 0;
+      font: inherit;
+      box-shadow: none;
+      transition: background 0.2s ease;
+    }
+
+    .overview-toggle:hover {
+      background: rgba(123, 208, 255, 0.08);
+      transform: none;
+      box-shadow: none;
+    }
+
+    .overview-toggle:focus-visible {
+      outline: 3px solid rgba(108, 181, 255, 0.6);
+      outline-offset: 2px;
+      box-shadow: none;
+      transform: none;
+    }
+
+    .overview-toggle-text {
+      display: flex;
+      flex-direction: column;
+      gap: 0.45rem;
+      flex: 1 1 auto;
+      min-width: 0;
+    }
+
+    .overview-toggle-text .eyebrow {
+      color: #a6b9d8;
+    }
+
+    .overview-title-row {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: baseline;
+      gap: 0.75rem;
+    }
+
+    .overview-title-row h2 {
+      margin: 0;
+      font-size: 1.25rem;
+      font-weight: 600;
+      color: #eef3ff;
+    }
+
+    .overview-metrics {
+      display: inline-flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+    }
+
+    .overview-pill {
+      display: inline-flex;
+      align-items: center;
+      padding: 0.25rem 0.7rem;
+      border-radius: 999px;
+      border: 1px solid rgba(123, 208, 255, 0.35);
+      background: rgba(123, 208, 255, 0.16);
+      font-size: 0.78rem;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: #d3e7ff;
+      white-space: nowrap;
+    }
+
+    .toggle-icon {
+      position: relative;
+      flex-shrink: 0;
+      width: 2.35rem;
+      height: 2.35rem;
+      border-radius: 12px;
+      border: 1px solid rgba(123, 208, 255, 0.35);
+      background: rgba(8, 14, 23, 0.85);
+      color: #89d6ff;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.2s ease, color 0.2s ease;
+    }
+
+    .toggle-icon::before,
+    .toggle-icon::after {
+      content: '';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 14px;
+      height: 2px;
+      border-radius: 999px;
+      background: currentColor;
+      transform: translate(-50%, -50%);
+      transition: transform 0.2s ease, opacity 0.2s ease;
+    }
+
+    .toggle-icon::after {
+      transform: translate(-50%, -50%) rotate(90deg);
+    }
+
+    .overview-wrapper[data-open="true"] .overview-master-toggle .toggle-icon {
+      background: rgba(123, 208, 255, 0.2);
+      color: #e0f7ff;
+    }
+
+    .overview-wrapper[data-open="true"] .overview-master-toggle .toggle-icon::after {
+      opacity: 0;
+      transform: translate(-50%, -50%) rotate(90deg) scaleX(0.2);
+    }
+
+    .overview-section[data-open="true"] .toggle-icon {
+      background: rgba(123, 208, 255, 0.2);
+      color: #e0f7ff;
+    }
+
+    .overview-section[data-open="true"] .toggle-icon::after {
+      opacity: 0;
+      transform: translate(-50%, -50%) rotate(90deg) scaleX(0.2);
+    }
+
+    .overview-panel {
+      padding: 0 1.6rem 1.6rem;
+      display: grid;
+      gap: 1.2rem;
+    }
+
+    .overview-section[data-open="true"] .overview-panel {
+      animation: overviewFade 0.25s ease;
+    }
+
+    @keyframes overviewFade {
+      from {
+        opacity: 0;
+        transform: translateY(-6px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .overview-description {
+      margin: 0;
+      color: #c5d5f3;
+      font-size: 0.95rem;
+      line-height: 1.65;
+    }
+
+    .overview-contents {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: grid;
+      gap: 0.9rem;
+    }
+
+    .overview-item {
+      background: rgba(6, 12, 20, 0.9);
+      border: 1px solid rgba(108, 181, 255, 0.2);
+      border-radius: 14px;
+      padding: 1rem 1.2rem;
+      display: grid;
+      gap: 0.5rem;
+    }
+
+    .overview-item-header {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 0.75rem;
+    }
+
+    .overview-item strong {
+      font-weight: 600;
+      color: #f0f5ff;
+      font-size: 1.05rem;
+      letter-spacing: 0.01em;
+    }
+
+    .overview-item-description {
+      margin: 0;
+      font-size: 0.92rem;
+      color: #b8c8e5;
+      line-height: 1.55;
+    }
+
+    .overview-item .content-count {
+      font-size: 0.78rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: #8ac8ff;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+
+    body[data-route="welcome"] {
+      align-items: center;
+      padding-block: clamp(1.1rem, 4vh, 2.4rem);
+    }
+
+    body[data-route="welcome"] #app {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      width: 100%;
+    }
+
+    body[data-route="welcome"] .card {
+      padding: clamp(2rem, calc(3vh + 1rem), 2.75rem);
+    }
+
+    body[data-route="welcome"] .welcome {
+      gap: clamp(0.75rem, 2vh, 1.2rem);
+    }
+
+    .logo {
+      width: min(220px, 60vw);
+      margin: 0 auto clamp(1rem, 2.5vh, 1.6rem);
+      padding: clamp(0.75rem, 2vh, 1rem);
+      background: rgba(12, 18, 26, 0.85);
+      border-radius: 28px;
+      border: 1px solid rgba(132, 153, 188, 0.35);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 16px 32px rgba(0, 0, 0, 0.4);
+    }
+
+    .logo img {
+      width: 100%;
+      height: auto;
+      display: block;
+    }
+
+    button {
+      font: inherit;
+      border-radius: 999px;
+      padding: 0.85rem 1.8rem;
+      border: 1px solid rgba(110, 150, 255, 0.35);
+      color: #0b1118;
+      background: linear-gradient(135deg, #6cb5ff, #75ffe5);
+      cursor: pointer;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      transition: transform 0.15s ease, box-shadow 0.15s ease, opacity 0.2s ease;
+      min-width: 140px;
+    }
+
+    button:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 12px 30px rgba(71, 194, 255, 0.35);
+    }
+
+    button:disabled {
+      cursor: not-allowed;
+      opacity: 0.5;
+      box-shadow: none;
+      transform: none;
+    }
+
+    button:focus-visible {
+      outline: 3px solid rgba(108, 181, 255, 0.9);
+      outline-offset: 2px;
+    }
+
+    .secondary {
+      background: transparent;
+      color: #e2e9f2;
+      border: 1px solid rgba(132, 153, 188, 0.7);
+    }
+
+    .secondary:hover {
+      box-shadow: 0 10px 24px rgba(132, 153, 188, 0.25);
+    }
+
+    .primary {
+      margin-left: auto;
+    }
+
+    .video-step {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: clamp(1.5rem, 3vw, 3rem);
+      align-items: stretch;
+      margin-top: 3rem;
+    }
+
+    .video-area {
+      min-width: 0;
+    }
+
+    video {
+      width: 100%;
+      border-radius: 18px;
+      border: 1px solid rgba(104, 140, 201, 0.35);
+      background: #04070d;
+      box-shadow: 0 16px 32px rgba(0, 0, 0, 0.4);
+    }
+
+    .video-fallback {
+      margin-top: 1rem;
+      padding: 1rem 1.25rem;
+      border-radius: 12px;
+      border: 1px solid rgba(132, 153, 188, 0.35);
+      background: rgba(12, 18, 26, 0.85);
+      color: #dbe5f3;
+      font-size: 0.95rem;
+      line-height: 1.5;
+    }
+
+    .video-fallback a {
+      color: #6cb5ff;
+      font-weight: 600;
+      text-decoration: none;
+    }
+
+    .video-fallback a:hover,
+    .video-fallback a:focus-visible {
+      text-decoration: underline;
+      outline: none;
+    }
+
+    .questions {
+      min-width: 0;
+      background: linear-gradient(165deg, rgba(10, 16, 24, 0.92), rgba(7, 12, 20, 0.86));
+      border-radius: 22px;
+      padding: clamp(1.25rem, 2vw, 1.85rem);
+      border: 1px solid rgba(90, 120, 150, 0.22);
+      box-shadow: 0 24px 55px rgba(0, 0, 0, 0.35);
+      display: flex;
+      flex-direction: column;
+      gap: clamp(0.9rem, 1.6vw, 1.25rem);
+    }
+
+    fieldset {
+      border: 1px solid rgba(108, 181, 255, 0.16);
+      border-radius: 20px;
+      padding: clamp(1rem, 1.8vw, 1.4rem);
+      margin: 0;
+      background: rgba(9, 15, 23, 0.86);
+      box-shadow: 0 18px 38px rgba(4, 9, 16, 0.35);
+    }
+
+    fieldset[hidden] {
+      display: none !important;
+    }
+
+    legend {
+      font-size: clamp(1.02rem, 1.5vw, 1.18rem);
+      margin: 0 0 0.6rem;
+      font-weight: 600;
+      color: #f2f5ff;
+      letter-spacing: 0.01em;
+    }
+    .stars-fieldset {
+      margin: 0;
+      padding: clamp(1.1rem, 2vw, 1.6rem);
+      border: none;
+      border-radius: 18px;
+      background: linear-gradient(160deg, rgba(18, 26, 36, 0.88), rgba(9, 13, 20, 0.9));
+      box-shadow: none;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: clamp(0.75rem, 1.5vh, 1rem);
+    }
+
+    .stars-legend {
+      margin: 0;
+      font-size: 1.05rem;
+      font-weight: 600;
+      text-align: center;
+      color: #d8e7ff;
+    }
+
+    .stars-helper {
+      margin: 0;
+      text-align: center;
+      font-size: 0.88rem;
+      color: #8ea3c7;
+      max-width: 36ch;
+    }
+
+    .stars {
+      display: inline-flex;
+      gap: clamp(0.45rem, 1vw, 0.75rem);
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+    }
+
+    .stars input[type="radio"] {
+      position: absolute;
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .stars label {
+      font-size: clamp(2.05rem, 3vw + 1rem, 2.6rem);
+      color: #2f3845;
+      cursor: pointer;
+      transition: color 0.2s ease, transform 0.2s ease, background-color 0.2s ease, outline-color 0.2s ease;
+      padding: 0.1rem 0.25rem;
+      border-radius: 0.4rem;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 2.2rem;
+    }
+
+    .stars label.active {
+      color: #f6c445;
+      text-shadow: 0 0 18px rgba(246, 196, 69, 0.45);
+      transform: scale(1.03);
+    }
+
+    .stars label:hover,
+    .stars label:focus-visible,
+    .stars input[type="radio"]:focus + label {
+      color: #ffe27a;
+      background: rgba(116, 154, 255, 0.12);
+      outline: 2px solid rgba(116, 154, 255, 0.35);
+      outline-offset: 4px;
+      transform: translateY(-2px);
+    }
+
+    .stars-scale {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 0.78rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: #7c93b6;
+    }
+
+    .stars-scale span {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      white-space: nowrap;
+    }
+
+    .progress {
+      margin-top: 0.5rem;
+      font-size: 1rem;
+      color: #9fb4d4;
+    }
+
+    .nav-buttons {
+      display: flex;
+      gap: 1.25rem;
+      margin-top: 3.5rem;
+    }
+
+    .status {
+      margin-top: 1.5rem;
+      min-height: 1.25rem;
+      font-size: 0.95rem;
+      color: #a9bdd6;
+    }
+
+    .status[data-type="error"] {
+      color: #ff9b9b;
+    }
+
+    .status[data-type="success"] {
+      color: #7be0a0;
+    }
+
+    .status[data-type="warning"] {
+      color: #ffcc80;
+    }
+
+    .status.hidden {
+      visibility: hidden;
+    }
+
+    .top-bar {
+      display: flex;
+      flex-direction: column;
+      gap: 1.4rem;
+    }
+
+    .top-bar-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 0.85rem;
+    }
+
+    .section-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.35rem 0.95rem;
+      border-radius: 999px;
+      border: 1px solid rgba(108, 181, 255, 0.35);
+      background: linear-gradient(135deg, rgba(108, 181, 255, 0.2), rgba(117, 255, 229, 0.14));
+      font-size: 0.85rem;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: #e8f1ff;
+    }
+
+    .top-bar .progress {
+      margin: 0;
+      font-size: 0.95rem;
+      color: #9fb4d4;
+    }
+
+    .content-meta {
+      display: grid;
+      gap: 1.5rem;
+      align-items: stretch;
+      padding: 1.35rem 1.5rem;
+      border-radius: 16px;
+      border: 1px solid rgba(120, 150, 200, 0.28);
+      background: rgba(12, 18, 26, 0.85);
+    }
+
+    .content-info {
+      display: flex;
+      flex-direction: column;
+      gap: 0.4rem;
+    }
+
+    .content-info .eyebrow {
+      color: #8ea3c7;
+    }
+
+    .content-title {
+      font-size: clamp(1.9rem, 2.2vw + 1.2rem, 2.8rem);
+      margin: 0;
+      font-weight: 600;
+      color: #f4f6fb;
+    }
+
+    .content-subtitle {
+      margin: 0;
+      font-size: clamp(1rem, 0.4vw + 0.95rem, 1.2rem);
+      color: #b8c8e5;
+      line-height: 1.6;
+    }
+
+    .clip-progress {
+      display: flex;
+      flex-direction: column;
+      gap: 0.65rem;
+      align-items: flex-start;
+    }
+
+    .clip-progress .eyebrow {
+      color: #8ea3c7;
+    }
+
+    .clip-dots {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+
+    .clip-dot {
+      width: 2.1rem;
+      height: 2.1rem;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 999px;
+      border: 1px solid rgba(108, 181, 255, 0.25);
+      background: rgba(108, 181, 255, 0.12);
+      font-size: 0.95rem;
+      color: #cfe3ff;
+      opacity: 0.6;
+      transition: transform 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease;
+    }
+
+    .clip-dot.is-active {
+      background: linear-gradient(135deg, #6cb5ff, #75ffe5);
+      color: #0b1118;
+      box-shadow: 0 10px 24px rgba(108, 181, 255, 0.28);
+      opacity: 1;
+      transform: translateY(-1px);
+    }
+
+    .clip-label {
+      font-size: 0.95rem;
+      color: #d0def7;
+    }
+
+    @media (min-width: 720px) {
+      .welcome-overview {
+        grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      }
+    }
+
+    @media (min-width: 960px) {
+      .content-meta {
+        grid-template-columns: minmax(0, 1fr) minmax(220px, 280px);
+      }
+    }
+
+    .final-view {
+      text-align: center;
+    }
+
+    .final-message {
+      margin: 1.5rem auto 0;
+      font-size: 1.2rem;
+      color: #dce7ff;
+    }
+
+    .final-note {
+      margin: 1.75rem auto 0;
+      max-width: 520px;
+      font-size: 1.05rem;
+      color: #c0d3f2;
+      line-height: 1.6;
+    }
+
+    .final-note + .final-note {
+      margin-top: 1.15rem;
+    }
+
+    .final-actions {
+      margin-top: 2.5rem;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 1rem;
+      flex-wrap: wrap;
+    }
+
+    .final-actions .primary {
+      margin-left: 0;
+    }
+
+    .final-view .status {
+      margin-top: 2.5rem;
+      text-align: center;
+    }
+
+    .final-summary {
+      margin: 2.5rem auto 0;
+      padding: 0;
+      list-style: none;
+      display: grid;
+      gap: 1rem;
+      max-width: 520px;
+    }
+
+    .final-summary-item {
+      background: rgba(12, 18, 26, 0.85);
+      border: 1px solid rgba(120, 150, 200, 0.28);
+      border-radius: 14px;
+      padding: 1rem 1.25rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.35rem;
+    }
+
+    .final-summary-title {
+      font-weight: 600;
+      font-size: 1.05rem;
+      color: #eef3ff;
+      letter-spacing: 0.01em;
+    }
+
+    .final-summary-meta {
+      font-size: 0.86rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: #94add3;
+      font-weight: 600;
+    }
+
+    .final-success {
+      margin-top: 2.5rem;
+      font-size: 1.08rem;
+      color: #7be0a0;
+      line-height: 1.6;
+    }
+
+    .error-view {
+      text-align: center;
+      max-width: 560px;
+      margin: 0 auto;
+    }
+
+    .error-view h2 {
+      margin-bottom: 1rem;
+    }
+
+    .debug-panel {
+      position: fixed;
+      right: 1rem;
+      bottom: 1rem;
+      background: rgba(10, 15, 22, 0.92);
+      border: 1px solid rgba(120, 150, 200, 0.35);
+      border-radius: 12px;
+      padding: 1rem 1.25rem;
+      font-size: 0.9rem;
+      color: #c8d9f1;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.45);
+      max-width: 260px;
+      z-index: 50;
+    }
+
+    .debug-panel h3 {
+      font-size: 1rem;
+      margin-bottom: 0.6rem;
+    }
+
+    .debug-panel button {
+      margin-top: 0.8rem;
+      width: 100%;
+      background: rgba(120, 150, 200, 0.2);
+      color: #f5f7fa;
+      border-color: rgba(120, 150, 200, 0.65);
+    }
+
+    .debug-panel button:hover {
+      box-shadow: none;
+      transform: none;
+      background: rgba(120, 150, 200, 0.35);
+    }
+
+    @media (max-height: 780px) {
+      body[data-route="welcome"] {
+        padding-block: clamp(0.75rem, 3vh, 1.5rem);
+      }
+
+      body[data-route="welcome"] .card {
+        padding: clamp(1.65rem, calc(2.5vh + 0.9rem), 2.2rem);
+      }
+
+      body[data-route="welcome"] .welcome p {
+        font-size: clamp(0.94rem, calc(1.6vh + 0.6rem), 1rem);
+        line-height: 1.5;
+      }
+
+      body[data-route="welcome"] .logo {
+        width: min(200px, 55vw);
+      }
+    }
+
+    @media (max-width: 900px) {
+      body {
+        padding: 1.75rem 0.75rem 2.75rem;
+      }
+
+      .card {
+        padding: 2.25rem 1.75rem;
+      }
+
+      .content-meta {
+        padding: 1.2rem 1.3rem;
+        gap: 1.1rem;
+      }
+
+      .clip-dot {
+        width: 1.85rem;
+        height: 1.85rem;
+        font-size: 0.85rem;
+      }
+
+      .welcome-overview {
+        gap: 1.25rem;
+      }
+
+      .overview-toggle {
+        padding: 1.25rem 1.35rem;
+        align-items: flex-start;
+      }
+
+      .overview-panel {
+        padding: 0 1.35rem 1.35rem;
+      }
+
+      .toggle-icon {
+        width: 2.1rem;
+        height: 2.1rem;
+      }
+
+      .overview-item {
+        padding: 0.9rem 1rem;
+      }
+
+      .video-step {
+        flex-direction: column;
+        gap: 1.75rem;
+      }
+
+      .video-area,
+      .questions {
+        min-width: 0;
+      }
+
+      .questions {
+        padding: 1.75rem;
+      }
+
+      .nav-buttons {
+        flex-direction: column-reverse;
+        align-items: stretch;
+        margin-top: 2.5rem;
+      }
+
+      .primary {
+        margin-left: 0;
+      }
+    }
+  </style>
+  <script src="config.js"></script>
+</head>
+<body>
+  <div id="app" role="main" aria-live="polite"></div>
+  <script>
+    (function () {
+      'use strict';
+
+      const appEl = document.getElementById('app');
+      const state = {
+        config: null,
+        uid: null,
+        started: false,
+        currentIndex: 0,
+        answers: [],
+        submitted: false,
+        error: null,
+        statusMessage: '',
+        statusType: 'info',
+        debug: false,
+        queueLength: 0
+      };
+
+      const storageKeys = {
+        state: (uid) => `survey_state_${toStorageKeyFragment(uid)}`,
+        queue: (uid) => `survey_queue_${toStorageKeyFragment(uid)}`
+      };
+
+      const SESSION_ID_STORAGE_KEY = 'survey_session_id';
+
+      let dataAdapter = null;
+
+      init();
+
+      function init() {
+        try {
+          state.config = loadConfig();
+        } catch (err) {
+          state.error = err instanceof Error ? err.message : String(err);
+          render();
+          return;
+        }
+
+        const params = new URLSearchParams(window.location.search);
+        state.debug = params.get('debug') === '1';
+        state.uid = initializeSessionId(params);
+
+        document.title = state.config.SURVEY_TITLE;
+
+        loadStoredState();
+        initRouter();
+        initializeDataAdapter();
+
+        window.addEventListener('online', () => {
+          setStatus('Connessione ripristinata. Sincronizzo le risposte in sospeso…', 'info');
+          flushQueue();
+        });
+        window.addEventListener('offline', () => {
+          setStatus('Sembra che tu sia offline. Le risposte verranno sincronizzate quando ti ricollegherai.', 'warning');
+        });
+
+        window.addEventListener('pagehide', () => {
+          if (dataAdapter) {
+            dataAdapter.flushQueueWithBeacon();
+          }
+        });
+        window.addEventListener('beforeunload', () => {
+          if (dataAdapter) {
+            dataAdapter.flushQueueWithBeacon();
+          }
+        });
+
+        render();
+        flushQueue();
+      }
+
+      function loadConfig() {
+        const conf = window.CONFIG;
+        if (!conf || typeof conf !== 'object') {
+          throw new Error('Configurazione mancante. Aggiungi config.js con un oggetto CONFIG.');
+        }
+        const { sections, FORM_ENDPOINT, SURVEY_TITLE, VIDEO_BASE_URL } = conf;
+        if (!Array.isArray(sections) || sections.length === 0) {
+          throw new Error('CONFIG.sections deve essere un array con almeno una sezione.');
+        }
+        const normalizedSections = normalizeSections(sections, VIDEO_BASE_URL);
+        const playlist = flattenSections(normalizedSections);
+        if (!playlist.length) {
+          throw new Error('CONFIG.sections deve includere contenuti con almeno un video.');
+        }
+        if (typeof FORM_ENDPOINT !== 'string' || !FORM_ENDPOINT.trim()) {
+          throw new Error('CONFIG.FORM_ENDPOINT è obbligatorio.');
+        }
+        if (typeof SURVEY_TITLE !== 'string' || !SURVEY_TITLE.trim()) {
+          throw new Error('CONFIG.SURVEY_TITLE è obbligatorio.');
+        }
+        return {
+          ...conf,
+          sections: normalizedSections,
+          playlist,
+          totalVideos: playlist.length
+        };
+      }
+
+      function initRouter() {
+        window.addEventListener('popstate', () => {
+          render();
+        });
+        history.replaceState({ index: state.currentIndex, started: state.started }, document.title);
+      }
+
+      function initializeDataAdapter() {
+        dataAdapter = createDataAdapter(state.uid);
+        dataAdapter.setOnSent((record) => {
+          markRecordSent(record.submission_id);
+        });
+        dataAdapter.setOnError((message) => {
+          setStatus(message, 'error');
+        });
+        dataAdapter.onQueueChange((queue) => {
+          handleQueueChange(queue);
+        });
+        state.queueLength = dataAdapter.getQueue().length;
+      }
+
+      function initializeSessionId(params) {
+        const explicit = readUid(params);
+        if (explicit) {
+          rememberSessionId(explicit);
+          return explicit;
+        }
+        const stored = getStoredSessionId();
+        if (stored) {
+          return stored;
+        }
+        const generated = generateSessionId();
+        rememberSessionId(generated);
+        return generated;
+      }
+
+      function getStoredSessionId() {
+        try {
+          const value = localStorage.getItem(SESSION_ID_STORAGE_KEY);
+          if (typeof value === 'string') {
+            const trimmed = value.trim();
+            if (trimmed) {
+              return trimmed;
+            }
+          }
+        } catch (err) {
+          /* ignore storage errors */
+        }
+        return null;
+      }
+
+      function rememberSessionId(value) {
+        if (typeof value !== 'string') {
+          return;
+        }
+        const normalized = value.trim();
+        if (!normalized) {
+          return;
+        }
+        try {
+          localStorage.setItem(SESSION_ID_STORAGE_KEY, normalized);
+        } catch (err) {
+          /* ignore storage errors */
+        }
+      }
+
+      function generateSessionId() {
+        const random = Math.random().toString(16).slice(2, 10);
+        const timestamp = Date.now().toString(16);
+        return `anon-${timestamp}-${random}`;
+      }
+
+      function toStorageKeyFragment(uid) {
+        if (typeof uid !== 'string') {
+          return 'anonymous';
+        }
+        const trimmed = uid.trim();
+        if (!trimmed) {
+          return 'anonymous';
+        }
+        return trimmed.replace(/[^a-z0-9_-]/gi, '_');
+      }
+
+      function getStateStorage() {
+        try {
+          return window.sessionStorage;
+        } catch (err) {
+          return null;
+        }
+      }
+
+      function readUid(params) {
+        if (!(params instanceof URLSearchParams)) {
+          params = new URLSearchParams(window.location.search);
+        }
+        const uid = params.get('uid');
+        if (!uid) {
+          return null;
+        }
+        const trimmed = uid.trim();
+        return trimmed.length > 0 ? trimmed : null;
+      }
+
+      function loadStoredState() {
+        const storage = getStateStorage();
+        if (!storage) {
+          return;
+        }
+        const raw = storage.getItem(storageKeys.state(state.uid));
+        if (!raw) {
+          return;
+        }
+        try {
+          const saved = JSON.parse(raw);
+          if (saved && typeof saved === 'object') {
+            state.started = Boolean(saved.started);
+            const maxIndex = getTotalVideos();
+            state.currentIndex = typeof saved.currentIndex === 'number' && saved.currentIndex >= 0
+              ? Math.min(saved.currentIndex, maxIndex)
+              : 0;
+            state.submitted = Boolean(saved.submitted);
+            if (Array.isArray(saved.answers)) {
+              state.answers = saved.answers.map((item) => normalizeAnswer(item));
+              if (state.answers.length > maxIndex) {
+                state.answers = state.answers.slice(0, maxIndex);
+              }
+            }
+          }
+        } catch (err) {
+          console.warn('Impossibile caricare lo stato salvato', err);
+        }
+      }
+
+      function normalizeAnswer(value) {
+        if (!value || typeof value !== 'object') {
+          return {};
+        }
+        return {
+          quality: typeof value.quality === 'number' ? value.quality : undefined,
+          posted: Boolean(value.posted),
+          submissionId: typeof value.submissionId === 'string' ? value.submissionId : undefined
+        };
+      }
+
+      function persistState() {
+        if (!state.uid) {
+          return;
+        }
+        const payload = {
+          started: state.started,
+          currentIndex: state.currentIndex,
+          answers: state.answers,
+          submitted: state.submitted
+        };
+        const storage = getStateStorage();
+        if (!storage) {
+          return;
+        }
+        try {
+          storage.setItem(storageKeys.state(state.uid), JSON.stringify(payload));
+        } catch (err) {
+          console.warn('Impossibile salvare lo stato', err);
+        }
+      }
+
+      function getRoute() {
+        if (state.error) {
+          return 'error';
+        }
+        if (!state.started) {
+          return 'welcome';
+        }
+        if (state.currentIndex >= getTotalVideos()) {
+          return 'final';
+        }
+        return 'step';
+      }
+
+      function render() {
+        const route = getRoute();
+        document.body.dataset.route = route;
+        if (route === 'error') {
+          renderError();
+        } else if (route === 'welcome') {
+          renderWelcome();
+        } else if (route === 'final') {
+          renderFinal();
+        } else {
+          renderStep(state.currentIndex);
+        }
+        renderDebugPanel();
+        renderStatus();
+        history.replaceState({ index: state.currentIndex, started: state.started }, document.title);
+      }
+
+      function renderError() {
+        const title = 'Errore di configurazione';
+        const description = typeof state.error === 'string'
+          ? state.error
+          : 'Contatta l\'organizzatore per ricevere assistenza.';
+        appEl.innerHTML = `
+          <section class="card error-view" aria-labelledby="error-title">
+            <h1 id="error-title">${escapeHtml(title)}</h1>
+            <p>${escapeHtml(description)}</p>
+            <p>Se il problema persiste, contatta il coordinatore dello studio.</p>
+          </section>
+        `;
+      }
+
+      function renderWelcome() {
+        const overviewMarkup = buildWelcomeOverview();
+        const overviewWrapperMarkup = overviewMarkup
+          ? `
+            <div class="overview-wrapper" data-open="false">
+              <button class="overview-master-toggle" type="button" aria-expanded="false" aria-controls="welcome-overview-panel">
+                <span class="sr-only">Mostra o nascondi le sezioni del questionario</span>
+                <span class="toggle-icon" aria-hidden="true"></span>
+              </button>
+              <div class="overview-master-panel" id="welcome-overview-panel" hidden>
+                <div class="welcome-overview" aria-label="Struttura del questionario">${overviewMarkup}</div>
+              </div>
+            </div>
+          `
+          : '';
+        appEl.innerHTML = `
+          <section class="card welcome" aria-labelledby="welcome-title">
+            <div class="logo">
+              <img src="MFE_-_MediaForEurope_Logo%20(1).png" alt="Logo MediaForEurope">
+            </div>
+            <h1 id="welcome-title">${escapeHtml(state.config.SURVEY_TITLE)}</h1>
+            <p>Benvenuta/o sul portale in cui abbiamo raccolto tutti i video che sono stati generati con AI dai partecipanti all’esplorazione di mercato.  <br> Nelle pagine seguenti troverai 10 video che mirano a ricostruire la scena di alcuni fatti di cronaca; nello specifico “La strage di Erba” e “L’omicidio di Laura Ziliani”.  <br>
+Per ragioni di tempo non tutti i partecipanti hanno prodotto entrambe le ricostruzioni. </p>
+            <p> Per ciascun video ti chiediamo di indicare il livello qualitativo percepito esprimendo una valutazione da 1 (scarso) a 5 (eccellente) in modo da aiutarci a indirizzare le fasi successive dell’attività.</p>
+             <p>Questa valutazione qualitativa sarà accompagnata da una valutazione di sintesi delle tariffe espresse dai partecipanti. </p> 
+             <p> Buona Visione! </p>
+            <p> Clicca sul <strong> + </strong> per esplorare il contenuto della survey. </p>
+            ${overviewWrapperMarkup}
+            <p> Clicca “Inizia” per cominciare. </p>
+            <button type="button" id="start-btn">Inizia</button>
+            <div class="status" data-role="status" aria-live="polite"></div>
+          </section>
+        `;
+        const startBtn = document.getElementById('start-btn');
+        startBtn.addEventListener('click', () => {
+          state.started = true;
+          if (state.currentIndex >= getTotalVideos()) {
+            state.currentIndex = 0;
+          }
+          persistState();
+          render();
+        });
+        initWelcomeOverviewInteractions();
+      }
+
+      function buildWelcomeOverview() {
+        const sections = state.config && Array.isArray(state.config.sections) ? state.config.sections : [];
+        if (!sections.length) {
+          return '';
+        }
+        return sections.map((section, sectionIndex) => {
+          const contents = Array.isArray(section.contents) ? section.contents : [];
+          const descriptionMarkup = section.description
+            ? `<p class="overview-description">${escapeHtml(section.description)}</p>`
+            : '';
+          const itemsMarkup = contents.map((content) => {
+            const clips = Array.isArray(content.videos) ? content.videos.length : 0;
+            const clipLabel = clips === 1 ? '1 clip' : `${clips} clip`;
+            const contentDescription = content.description
+              ? `<p class="overview-item-description">${escapeHtml(content.description)}</p>`
+              : '';
+            return `
+              <li class="overview-item">
+                <div class="overview-item-header">
+                  <strong>${escapeHtml(content.title)}</strong>
+                  <span class="content-count">${escapeHtml(clipLabel)}</span>
+                </div>
+                ${contentDescription}
+              </li>
+            `;
+          }).join('');
+          const listMarkup = itemsMarkup ? `<ul class="overview-contents">${itemsMarkup}</ul>` : '';
+          const contentCount = contents.length;
+          const totalClips = contents.reduce((acc, content) => acc + (Array.isArray(content.videos) ? content.videos.length : 0), 0);
+          const contentLabel = contentCount === 1 ? '1 provider' : `${contentCount} providers`;
+          const clipLabel = totalClips === 1 ? '1 clip' : `${totalClips} clip`;
+          const sectionId = `overview-section-${sectionIndex}`;
+          const panelId = `overview-panel-${sectionIndex}`;
+          const hasPanel = Boolean(descriptionMarkup || listMarkup);
+          const controlsAttr = hasPanel ? ` aria-controls="${panelId}"` : '';
+          const expandedValue = hasPanel ? 'false' : 'true';
+          const openValue = hasPanel ? 'false' : 'true';
+          const panelMarkup = hasPanel
+            ? `
+              <div class="overview-panel" id="${panelId}" role="region" aria-labelledby="${sectionId}" hidden>
+                ${descriptionMarkup}
+                ${listMarkup}
+              </div>
+            `
+            : '';
+          const iconMarkup = '';
+          return `
+            <section class="overview-section" data-open="${openValue}">
+              <button class="overview-toggle" type="button" id="${sectionId}" aria-expanded="${expandedValue}"${controlsAttr}>
+                <div class="overview-toggle-text">
+                  <span class="eyebrow">Sezione ${sectionIndex + 1}</span>
+                  <div class="overview-title-row">
+                    <h2>${escapeHtml(section.title)}</h2>
+                    <div class="overview-metrics">
+                      <span class="overview-pill">${escapeHtml(contentLabel)}</span>
+                      <span class="overview-pill">${escapeHtml(clipLabel)}</span>
+                    </div>
+                  </div>
+                </div>
+                ${iconMarkup}
+              </button>
+              ${panelMarkup}
+            </section>
+          `;
+        }).join('');
+      }
+
+      function initWelcomeOverviewInteractions() {
+        const wrapper = appEl.querySelector('.overview-wrapper');
+        if (wrapper) {
+          const masterToggle = wrapper.querySelector('.overview-master-toggle');
+          const masterPanel = wrapper.querySelector('.overview-master-panel');
+          if (masterToggle && masterPanel) {
+            const isOpen = wrapper.dataset.open === 'true';
+            masterPanel.hidden = !isOpen;
+            masterToggle.setAttribute('aria-expanded', String(isOpen));
+            masterToggle.addEventListener('click', () => {
+              const currentlyOpen = wrapper.dataset.open === 'true';
+              const nextOpen = !currentlyOpen;
+              wrapper.dataset.open = String(nextOpen);
+              masterPanel.hidden = !nextOpen;
+              masterToggle.setAttribute('aria-expanded', String(nextOpen));
+            });
+          }
+        }
+        const sectionContainer = wrapper || appEl;
+        const sections = sectionContainer.querySelectorAll('.overview-section');
+        sections.forEach((sectionEl) => {
+          const toggle = sectionEl.querySelector('.overview-toggle');
+          if (!toggle) {
+            return;
+          }
+          const panel = sectionEl.querySelector('.overview-panel');
+          const hasPanel = Boolean(panel);
+          if (!hasPanel) {
+            toggle.setAttribute('aria-expanded', 'true');
+            sectionEl.dataset.open = 'true';
+            return;
+          }
+          const isOpen = sectionEl.dataset.open === 'true';
+          panel.hidden = !isOpen;
+          toggle.setAttribute('aria-expanded', String(isOpen));
+          toggle.addEventListener('click', () => {
+            const currentlyOpen = sectionEl.dataset.open === 'true';
+            const nextOpen = !currentlyOpen;
+            sectionEl.dataset.open = String(nextOpen);
+            panel.hidden = !nextOpen;
+            toggle.setAttribute('aria-expanded', String(nextOpen));
+          });
+        });
+      }
+
+      function buildFinalSummary() {
+        const sections = state.config && Array.isArray(state.config.sections) ? state.config.sections : [];
+        if (!sections.length) {
+          return '';
+        }
+        const items = sections.map((section) => {
+          const contents = Array.isArray(section.contents) ? section.contents : [];
+          const clipCount = contents.reduce((acc, content) => acc + (Array.isArray(content.videos) ? content.videos.length : 0), 0);
+          const contentCount = contents.length;
+          const contentLabel = contentCount === 1 ? '1 provider' : `${contentCount} providers`;
+          const clipLabel = clipCount === 1 ? '1 clip' : `${clipCount} clip`;
+          return `
+            <li class="final-summary-item">
+              <span class="final-summary-title">${escapeHtml(section.title)}</span>
+              <span class="final-summary-meta">${escapeHtml(`${contentLabel} • ${clipLabel}`)}</span>
+            </li>
+          `;
+        }).join('');
+        if (!items) {
+          return '';
+        }
+        return `<ul class="final-summary">${items}</ul>`;
+      }
+
+      function renderStep(index) {
+        const entry = getPlaylistEntry(index);
+        if (!entry) {
+          state.currentIndex = Math.min(index, getTotalVideos());
+          render();
+          return;
+        }
+        const answer = state.answers[index] || {};
+        const total = getTotalVideos();
+        const quality = typeof answer.quality === 'number' ? answer.quality : 0;
+        const videoUrl = entry.url;
+        const videoMimeType = getVideoMimeType(videoUrl);
+        const clipLabel = `Clip ${entry.clipNumber} di ${entry.content.clipCount}`;
+        const progressLabel = `Video ${index + 1} di ${total}`;
+        const sectionTooltip = entry.section.description ? ` title="${escapeAttribute(entry.section.description)}"` : '';
+        const clipTitles = Array.isArray(entry.content.clipTitles) ? entry.content.clipTitles : [];
+        const clipDots = Array.from({ length: entry.content.clipCount }, (_, clipIdx) => {
+          const isActive = clipIdx === entry.clipIndex;
+          const clipTitle = clipTitles[clipIdx];
+          const dotLabel = clipTitle
+            ? `Clip ${clipIdx + 1} di ${entry.content.clipCount} · ${clipTitle}`
+            : `Clip ${clipIdx + 1} di ${entry.content.clipCount}`;
+          const ariaCurrent = isActive ? ' aria-current="true"' : '';
+          const classes = `clip-dot${isActive ? ' is-active' : ''}`;
+          return `<span class="${classes}" role="listitem"${ariaCurrent} aria-label="${escapeAttribute(dotLabel)}">${clipIdx + 1}</span>`;
+        }).join('');
+        const contentGroupLabel = `${entry.section.title} – ${entry.content.title}`;
+        const mainTitle = isNonEmptyString(entry.clipTitle) ? entry.clipTitle : entry.content.title;
+        const subtitleParts = [];
+        if (isNonEmptyString(entry.content.title)) {
+          subtitleParts.push(`<strong>${escapeHtml(entry.content.title)}</strong>`);
+        }
+        if (isNonEmptyString(entry.content.description)) {
+          subtitleParts.push(escapeHtml(entry.content.description));
+        }
+        const subtitleHtml = subtitleParts.length > 0 ? `<p class="content-subtitle">${subtitleParts.join(' · ')}</p>` : '';
+        const qualityHintId = `quality-hint-${index + 1}`;
+
+        appEl.innerHTML = `
+          <section class="card" aria-labelledby="step-title">
+            <header class="top-bar">
+              <div class="top-bar-row">
+                <span class="section-chip"${sectionTooltip}>${escapeHtml(entry.section.title)}</span>
+                <p class="progress">${escapeHtml(progressLabel)}</p>
+              </div>
+              <h1 id="step-title">${escapeHtml(state.config.SURVEY_TITLE)}</h1>
+              <div class="content-meta" role="group" aria-label="${escapeAttribute(contentGroupLabel)}">
+                <div class="content-info">
+                  <span class="eyebrow">Contenuto</span>
+                  <h2 class="content-title">${escapeHtml(mainTitle)}</h2>
+                  ${subtitleHtml}
+                </div>
+                <div class="clip-progress">
+                  <span class="eyebrow">Clip</span>
+                  <div class="clip-dots" role="list" aria-label="Sequenza clip per ${escapeAttribute(entry.content.title)}">
+                    ${clipDots}
+                  </div>
+                  <span class="clip-label">${escapeHtml(clipLabel)}</span>
+                </div>
+              </div>
+            </header>
+            <div class="video-step">
+              <div class="video-area">
+                <video controls preload="metadata" src="${escapeAttribute(videoUrl)}">
+                  <source src="${escapeAttribute(videoUrl)}" type="${escapeAttribute(videoMimeType)}">
+                  Il tuo browser non supporta il tag video.
+                </video>
+                <div class="video-fallback" data-role="video-fallback" role="alert" hidden>
+                  Impossibile caricare il video. <a href="${escapeAttribute(videoUrl)}" target="_blank" rel="noopener noreferrer">Aprilo in una nuova scheda</a>.
+                </div>
+              </div>
+              <form class="questions" id="step-form">
+                <fieldset class="stars-fieldset">
+                  <legend class="stars-legend">Valuta la qualit&agrave; complessiva</legend>
+                  <div class="stars" role="radiogroup" aria-label="Valutazione della qualit&agrave; da una a cinque stelle" aria-describedby="${qualityHintId}">
+                    ${[1, 2, 3, 4, 5].map((value) => `
+                      <div class="star-wrapper">
+                        <input type="radio" id="quality-${value}" name="quality" value="${value}" ${quality === value ? 'checked' : ''}>
+                        <label for="quality-${value}" data-value="${value}" aria-label="${value} ${value === 1 ? 'stella' : 'stelle'}">★</label>
+                      </div>
+                    `).join('')}
+                  </div>
+                  <div class="stars-scale" aria-hidden="true">
+                    <span>1 · Da migliorare</span>
+                    <span>5 · Eccellente</span>
+                  </div>
+                </fieldset>
+              </form>
+            </div>
+            <div class="nav-buttons">
+              <button type="button" class="secondary" data-action="back">Indietro</button>
+              <button type="button" class="primary" data-action="next" disabled>Avanti</button>
+            </div>
+            <div class="status" data-role="status" aria-live="polite"></div>
+          </section>
+        `;
+        setupVideoPlayback(videoUrl, videoMimeType);
+        setupStepListeners(index, quality);
+      }
+
+      function setupVideoPlayback(videoUrl, videoMimeType) {
+        const videoEl = appEl.querySelector('.video-area video');
+        if (!videoEl) {
+          return;
+        }
+
+        const sourceEl = videoEl.querySelector('source');
+        if (sourceEl) {
+          sourceEl.src = videoUrl;
+          sourceEl.type = videoMimeType;
+        }
+
+        videoEl.setAttribute('src', videoUrl);
+        videoEl.src = videoUrl;
+        videoEl.setAttribute('playsinline', '');
+        videoEl.setAttribute('webkit-playsinline', '');
+
+        const fallbackEl = appEl.querySelector('[data-role="video-fallback"]');
+        if (fallbackEl) {
+          fallbackEl.hidden = true;
+          const fallbackLink = fallbackEl.querySelector('a');
+          if (fallbackLink) {
+            fallbackLink.href = videoUrl;
+          }
+        }
+
+        const fallbackStatusMessage = 'Impossibile caricare il video. Usa il link qui sotto per aprirlo in una nuova scheda.';
+        let fallbackVisible = false;
+
+        function hideFallback() {
+          if (fallbackEl) {
+            fallbackEl.hidden = true;
+          }
+          if (fallbackVisible && state.statusMessage === fallbackStatusMessage) {
+            setStatus('', 'info');
+          }
+          fallbackVisible = false;
+        }
+
+        function showFallback() {
+          if (fallbackVisible) {
+            return;
+          }
+          fallbackVisible = true;
+          if (fallbackEl) {
+            fallbackEl.hidden = false;
+          }
+          setStatus(fallbackStatusMessage, 'error');
+        }
+
+        videoEl.addEventListener('error', showFallback);
+        videoEl.addEventListener('loadeddata', hideFallback);
+        videoEl.addEventListener('loadedmetadata', hideFallback);
+        videoEl.addEventListener('canplay', hideFallback);
+        videoEl.addEventListener('play', hideFallback);
+
+        if (typeof videoEl.load === 'function') {
+          try {
+            videoEl.load();
+          } catch (err) {
+            // Ignoriamo gli errori del caricamento programmatico.
+          }
+        }
+
+        if (videoEl.readyState >= 2) {
+          hideFallback();
+        } else if (videoEl.error) {
+          showFallback();
+        }
+      }
+
+      function setupStepListeners(index, quality) {
+        const form = document.getElementById('step-form');
+        const nextBtn = appEl.querySelector('[data-action="next"]');
+        const backBtn = appEl.querySelector('[data-action="back"]');
+        const starsContainer = form.querySelector('.stars');
+        const qualityInputs = Array.from(form.querySelectorAll('input[name="quality"]'));
+
+        paintStars(starsContainer, quality);
+
+        function updateNextState() {
+          const answer = state.answers[index] || {};
+          const qualityAnswered = typeof answer.quality === 'number' && answer.quality >= 1 && answer.quality <= 5;
+          nextBtn.disabled = !qualityAnswered;
+        }
+
+        qualityInputs.forEach((input) => {
+          input.addEventListener('change', (event) => {
+            const value = Number(event.target.value);
+            paintStars(starsContainer, value);
+            saveAnswer(index, { quality: value });
+            updateNextState();
+          });
+          input.addEventListener('keydown', (event) => handleStarKeydown(event, qualityInputs));
+        });
+
+        starsContainer.addEventListener('keydown', (event) => handleStarKeydown(event, qualityInputs));
+
+        backBtn.addEventListener('click', () => {
+          if (index === 0) {
+            state.started = false;
+            persistState();
+            render();
+            return;
+          }
+          state.currentIndex = Math.max(0, index - 1);
+          persistState();
+          render();
+        });
+
+        nextBtn.addEventListener('click', async () => {
+          const answer = state.answers[index] || {};
+          if (!isAnswerComplete(answer)) {
+            setStatus('Rispondi a tutte le domande prima di continuare.', 'error');
+            updateNextState();
+            return;
+          }
+          nextBtn.disabled = true;
+          nextBtn.textContent = 'Salvataggio in corso…';
+          const record = buildRecord(index, answer);
+          const result = await postRecord(record);
+          if (!result.ok) {
+            setStatus('La tua risposta &egrave; salvata in locale e verr&agrave; sincronizzata appena possibile.', 'warning');
+          }
+          state.currentIndex = index + 1;
+          state.started = true;
+          persistState();
+          render();
+          flushQueue();
+        });
+
+        updateNextState();
+      }
+
+      function isAnswerComplete(answer) {
+        if (!answer) {
+          return false;
+        }
+        const qualityAnswered = typeof answer.quality === 'number' && answer.quality >= 1 && answer.quality <= 5;
+        return qualityAnswered;
+      }
+
+      function renderFinal() {
+        const total = getTotalVideos();
+        const pending = state.queueLength;
+        const allSent = allAnswersPosted();
+        const readyToSubmit = pending === 0 && allSent;
+        const sectionsCount = state.config && Array.isArray(state.config.sections) ? state.config.sections.length : 0;
+        const totalContents = state.config && Array.isArray(state.config.sections)
+          ? state.config.sections.reduce((acc, section) => acc + (Array.isArray(section.contents) ? section.contents.length : 0), 0)
+          : 0;
+        const summaryNote = sectionsCount > 0 && totalContents > 0
+          ? `Distribuite in ${sectionsCount} ${sectionsCount === 1 ? 'sezione' : 'sezioni'} e ${totalContents} ${totalContents === 1 ? 'provider' : 'providers'}.`
+          : '';
+        const noteText = state.submitted
+          ? ''
+          : readyToSubmit
+            ? 'Premi "Invia" per completare.'
+            : 'Mantieni questa pagina aperta finch&eacute; tutte le risposte non sono state sincronizzate.';
+        const summaryMarkup = buildFinalSummary();
+        appEl.innerHTML = `
+          <section class="card final-view" aria-labelledby="final-title">
+            <div class="logo">
+              <img src="MFE_-_MediaForEurope_Logo%20(1).png" alt="Logo MediaForEurope">
+            </div>
+            <h1 id="final-title">${escapeHtml(state.config.SURVEY_TITLE)}</h1>
+            <p class="final-message">Ottimo lavoro! Hai esaminato tutte le ${total} clip.</p>
+            ${summaryNote ? `<p class="final-note">${escapeHtml(summaryNote)}</p>` : ''}
+            ${summaryMarkup}
+            ${noteText ? `<p class="final-note">${noteText}</p>` : ''}
+            <div class="final-actions">
+              <button type="button" class="primary" id="submit-btn" ${readyToSubmit && !state.submitted ? '' : 'disabled'}>${state.submitted ? 'Inviato' : 'Invia'}</button>
+            </div>
+            <div class="status" data-role="status" aria-live="polite"></div>
+            ${state.submitted ? '<p class="final-success">Fatto! Le risposte sono state salvate e puoi chiudere questa pagina. Grazie!</p>' : ''}
+          </section>
+        `;
+
+        const submitBtn = document.getElementById('submit-btn');
+        if (submitBtn) {
+          submitBtn.addEventListener('click', async () => {
+            if (state.submitted) {
+              return;
+            }
+            if (state.queueLength > 0 || !allAnswersPosted()) {
+              setStatus('Stiamo ancora sincronizzando le tue risposte. Attendi che la coda sia vuota.', 'warning');
+              renderFinal();
+              return;
+            }
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Invio in corso…';
+            const success = await flushQueue();
+            if (success && allAnswersPosted()) {
+              state.submitted = true;
+              persistState();
+              setStatus('', 'info');
+            } else {
+              submitBtn.disabled = false;
+              submitBtn.textContent = 'Invia';
+              setStatus('Non &egrave; stato possibile confermare l\'invio. Controlla la connessione e riprova.', 'error');
+            }
+            renderFinal();
+          });
+        }
+      }
+
+      function saveAnswer(index, partial) {
+        const current = state.answers[index] ? { ...state.answers[index] } : {};
+        delete current.is_ai;
+        delete current.low_quality_reasons;
+        delete current.low_quality_reason;
+        delete current.low_quality_other_text;
+        let changed = false;
+        if (Object.prototype.hasOwnProperty.call(partial, 'quality')) {
+          if (current.quality !== partial.quality) {
+            changed = true;
+          }
+          current.quality = partial.quality;
+        }
+        if (changed) {
+          if (current.submissionId && dataAdapter) {
+            dataAdapter.discard(current.submissionId);
+          }
+          delete current.submissionId;
+          current.posted = false;
+        }
+        state.answers[index] = current;
+        persistState();
+      }
+
+      function buildRecord(index, answer) {
+        const videoId = makeVideoId(index);
+        const submissionId = makeSubmissionId(state.uid, videoId, answer);
+        const timestamp = new Date().toISOString();
+        const entry = getPlaylistEntry(index);
+        const record = {
+          user_code: state.uid,
+          video_id: videoId,
+          quality_rating: answer.quality,
+          timestamp,
+          user_agent: navigator.userAgent,
+          submission_id: submissionId
+        };
+        if (entry) {
+          record.section_id = entry.section.id;
+          record.section_title = entry.section.title;
+          record.content_id = entry.content.id;
+          record.content_title = entry.content.title;
+          record.clip_number = entry.clipNumber;
+          record.clip_total = entry.content.clipCount;
+          if (entry.clipTitle) {
+            record.clip_title = entry.clipTitle;
+          }
+        }
+        answer.submissionId = submissionId;
+        answer.posted = false;
+        state.answers[index] = answer;
+        persistState();
+        return record;
+      }
+
+      function postRecord(record) {
+        if (!dataAdapter) {
+          return Promise.resolve({ ok: false, error: 'Adattatore dati non disponibile.' });
+        }
+        return dataAdapter.postRecord(record).then((response) => {
+          if (response.ok) {
+            setStatus('', 'info');
+          }
+          return response;
+        });
+      }
+
+      function flushQueue() {
+        if (!dataAdapter) {
+          return Promise.resolve(false);
+        }
+        return dataAdapter.flushQueue().then((allSent) => {
+          if (allSent && state.queueLength === 0 && allAnswersPosted()) {
+            setStatus('Tutte le risposte sono sincronizzate.', 'success');
+          }
+          return allSent;
+        });
+      }
+
+      function handleQueueChange(queue) {
+        state.queueLength = queue.length;
+        if (getRoute() === 'final') {
+          renderFinal();
+        }
+        renderDebugPanel();
+      }
+
+      function markRecordSent(submissionId) {
+        if (!submissionId) {
+          return;
+        }
+        let updated = false;
+        state.answers = state.answers.map((answer) => {
+          if (answer && answer.submissionId === submissionId) {
+            updated = true;
+            return { ...answer, posted: true };
+          }
+          return answer;
+        });
+        if (updated) {
+          persistState();
+          if (state.queueLength === 0 && allAnswersPosted()) {
+            setStatus('Tutte le risposte sono sincronizzate.', 'success');
+          }
+        }
+      }
+
+      function allAnswersPosted() {
+        const total = getTotalVideos();
+        for (let i = 0; i < total; i += 1) {
+          const answer = state.answers[i];
+          if (!answer || !answer.posted) {
+            return false;
+          }
+        }
+        return true;
+      }
+
+      function renderStatus() {
+        const statusEl = document.querySelector('[data-role="status"]');
+        if (!statusEl) {
+          return;
+        }
+        if (!state.statusMessage) {
+          statusEl.textContent = '';
+          statusEl.classList.add('hidden');
+        } else {
+          statusEl.textContent = state.statusMessage;
+          statusEl.classList.remove('hidden');
+        }
+        statusEl.setAttribute('data-type', state.statusType || 'info');
+      }
+
+      function setStatus(message, type) {
+        state.statusMessage = message || '';
+        state.statusType = type || 'info';
+        renderStatus();
+      }
+
+      function renderDebugPanel() {
+        const existing = document.getElementById('debug-panel');
+        if (!state.debug) {
+          if (existing) {
+            existing.remove();
+          }
+          return;
+        }
+        let panel = existing;
+        if (!panel) {
+          panel = document.createElement('aside');
+          panel.id = 'debug-panel';
+          panel.className = 'debug-panel';
+          document.body.appendChild(panel);
+        }
+        const total = getTotalVideos();
+        const displayIndex = total > 0 ? Math.min(state.currentIndex + 1, total) : state.currentIndex;
+        const currentEntry = getPlaylistEntry(Math.min(state.currentIndex, total - 1));
+        const clipLabel = currentEntry
+          ? `${currentEntry.section.title} → ${currentEntry.content.title} (#${currentEntry.clipNumber}/${currentEntry.content.clipCount})`
+          : 'n/d';
+        panel.innerHTML = `
+          <h3>Informazioni di debug</h3>
+          <p><strong>ID sessione:</strong> ${escapeHtml(state.uid || 'n/d')}</p>
+          <p><strong>Indice:</strong> ${displayIndex}/${total}</p>
+          <p><strong>Clip:</strong> ${escapeHtml(clipLabel)}</p>
+          <p><strong>Coda:</strong> ${state.queueLength}</p>
+          <button type="button" id="clear-debug">Cancella dati locali</button>
+        `;
+        const clearBtn = document.getElementById('clear-debug');
+        if (clearBtn) {
+          clearBtn.addEventListener('click', () => {
+            if (!state.uid) {
+              return;
+            }
+            const storage = getStateStorage();
+            if (storage) {
+              storage.removeItem(storageKeys.state(state.uid));
+            }
+            localStorage.removeItem(storageKeys.queue(state.uid));
+            window.location.reload();
+          });
+        }
+      }
+
+      function makeVideoId(index) {
+        const entry = getPlaylistEntry(index);
+        if (entry && isNonEmptyString(entry.videoId)) {
+          return entry.videoId;
+        }
+        const number = String(index + 1).padStart(2, '0');
+        return `video-${number}`;
+      }
+
+      function makeSubmissionId(uid, videoId, answer) {
+        const payload = `${uid}::${videoId}::${answer.quality}`;
+        const hash = hashString(payload);
+        return `${uid}-${videoId}-${hash}`;
+      }
+
+      function hashString(value) {
+        let hash = 0;
+        for (let i = 0; i < value.length; i += 1) {
+          hash = (hash << 5) - hash + value.charCodeAt(i);
+          hash |= 0;
+        }
+        return Math.abs(hash).toString(16);
+      }
+
+      function normalizeSections(sections, defaultBaseUrl) {
+        return sections.map((section, sectionIndex) => {
+          const title = isNonEmptyString(section.title)
+            ? section.title.trim()
+            : `Sezione ${sectionIndex + 1}`;
+          const description = isNonEmptyString(section.description) ? section.description.trim() : '';
+          const sectionBase = isNonEmptyString(section.baseUrl) ? section.baseUrl : defaultBaseUrl;
+          const id = makeSafeId(section.id, title, `section-${sectionIndex + 1}`);
+          if (!Array.isArray(section.contents) || section.contents.length === 0) {
+            throw new Error(`La sezione "${title}" deve includere almeno un contenuto.`);
+          }
+          const contents = section.contents.map((content, contentIndex) => {
+            const contentTitle = isNonEmptyString(content.title)
+              ? content.title.trim()
+              : `Contenuto ${contentIndex + 1}`;
+            const contentDescription = isNonEmptyString(content.description) ? content.description.trim() : '';
+            const contentBase = isNonEmptyString(content.baseUrl) ? content.baseUrl : sectionBase;
+            const contentId = makeSafeId(content.id, `${title}-${contentTitle}`, `${id}-content-${contentIndex + 1}`);
+            if (!Array.isArray(content.videos) || content.videos.length === 0) {
+              throw new Error(`Il contenuto "${contentTitle}" nella sezione "${title}" deve includere almeno un video.`);
+            }
+            const normalizedVideos = normalizeVideos(content.videos, contentBase).map((video, videoIndex) => ({
+              url: video.url,
+              title: video.title,
+              id: `${contentId}-clip-${String(videoIndex + 1).padStart(2, '0')}`
+            }));
+            return {
+              id: contentId,
+              title: contentTitle,
+              description: contentDescription,
+              videos: normalizedVideos
+            };
+          });
+          return {
+            id,
+            title,
+            description,
+            contents
+          };
+        });
+      }
+
+      function flattenSections(sections) {
+        const playlist = [];
+        sections.forEach((section, sectionIndex) => {
+          section.contents.forEach((content, contentIndex) => {
+            const totalClips = content.videos.length;
+            const clipTitles = content.videos.map((video) => (isNonEmptyString(video.title) ? video.title : ''));
+            content.videos.forEach((video, clipIndex) => {
+              playlist.push({
+                url: video.url || '',
+                videoId: video.id || `${content.id}-clip-${String(clipIndex + 1).padStart(2, '0')}`,
+                section: {
+                  id: section.id,
+                  title: section.title,
+                  description: section.description,
+                  index: sectionIndex
+                },
+                content: {
+                  id: content.id,
+                  title: content.title,
+                  description: content.description,
+                  index: contentIndex,
+                  clipCount: totalClips,
+                  clipTitles
+                },
+                clipIndex,
+                clipNumber: clipIndex + 1,
+                clipTitle: isNonEmptyString(video.title) ? video.title : ''
+              });
+            });
+          });
+        });
+        return playlist.map((entry, index) => ({
+          ...entry,
+          absoluteIndex: index,
+          absoluteNumber: index + 1
+        }));
+      }
+
+      function getPlaylistEntry(index) {
+        if (!state.config || !Array.isArray(state.config.playlist)) {
+          return null;
+        }
+        if (typeof index !== 'number' || index < 0 || index >= state.config.playlist.length) {
+          return null;
+        }
+        return state.config.playlist[index];
+      }
+
+      function getTotalVideos() {
+        if (!state.config || !Array.isArray(state.config.playlist)) {
+          return 0;
+        }
+        return state.config.playlist.length;
+      }
+
+      function makeSafeId(candidate, label, fallback) {
+        if (isNonEmptyString(candidate)) {
+          const fromCandidate = slugify(candidate);
+          if (fromCandidate) {
+            return fromCandidate;
+          }
+        }
+        if (isNonEmptyString(label)) {
+          const fromLabel = slugify(label);
+          if (fromLabel) {
+            return fromLabel;
+          }
+        }
+        return fallback;
+      }
+
+      function slugify(value) {
+        return String(value || '')
+          .normalize('NFD')
+          .replace(/[\u0300-\u036f]/g, '')
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, '-')
+          .replace(/^-+|-+$/g, '');
+      }
+
+      function normalizeVideos(videos, baseUrl) {
+        return videos.map((entry, index) => {
+          const resolved = resolveVideoEntry(entry, baseUrl);
+          if (!isNonEmptyString(resolved)) {
+            throw new Error(`Voce video non valida in posizione ${index + 1}.`);
+          }
+          const title = getVideoTitle(entry);
+          return {
+            url: resolved,
+            title
+          };
+        });
+      }
+
+      function getVideoTitle(entry) {
+        if (entry && typeof entry === 'object' && isNonEmptyString(entry.title)) {
+          return entry.title.trim();
+        }
+        return '';
+      }
+
+      function resolveVideoEntry(entry, baseUrl) {
+        if (typeof entry === 'string') {
+          return resolveVideoUrl(entry, baseUrl);
+        }
+        if (entry && typeof entry === 'object') {
+          const candidates = [entry.url, entry.href, entry.path, entry.key, entry.filename, entry.file];
+          const candidate = candidates.find((value) => isNonEmptyString(value));
+          const candidateBase = isNonEmptyString(entry.baseUrl) ? entry.baseUrl : baseUrl;
+          if (isNonEmptyString(candidate)) {
+            return resolveVideoUrl(candidate, candidateBase);
+          }
+        }
+        return '';
+      }
+
+      function resolveVideoUrl(value, baseUrl) {
+        const trimmed = String(value || '').trim();
+        if (!trimmed) {
+          return '';
+        }
+        if (trimmed.startsWith('//')) {
+          return `${window.location.protocol}${trimmed}`;
+        }
+        if (isAbsoluteUrl(trimmed) || trimmed.startsWith('data:')) {
+          return trimmed;
+        }
+        const base = isNonEmptyString(baseUrl) ? baseUrl.trim() : '';
+        if (!base) {
+          return trimmed;
+        }
+        return joinUrl(base, trimmed);
+      }
+
+      function isAbsoluteUrl(value) {
+        return /^https?:\/\//i.test(value);
+      }
+
+      function joinUrl(base, path) {
+        const baseStr = String(base || '').trim();
+        const pathStr = String(path || '').trim();
+        if (!baseStr) {
+          return pathStr;
+        }
+        if (!pathStr) {
+          return baseStr;
+        }
+        const baseHasSlash = baseStr.endsWith('/');
+        const pathHasSlash = pathStr.startsWith('/');
+        if (baseHasSlash && pathHasSlash) {
+          return baseStr + pathStr.slice(1);
+        }
+        if (!baseHasSlash && !pathHasSlash) {
+          return `${baseStr}/${pathStr}`;
+        }
+        return baseStr + pathStr;
+      }
+
+      function isNonEmptyString(value) {
+        return typeof value === 'string' && value.trim().length > 0;
+      }
+
+      function escapeHtml(str) {
+        if (typeof str !== 'string') {
+          return '';
+        }
+        return str.replace(/[&<>"']/g, (char) => {
+          switch (char) {
+            case '&':
+              return '&amp;';
+            case '<':
+              return '&lt;';
+            case '>':
+              return '&gt;';
+            case '"':
+              return '&quot;';
+            case '\'':
+              return '&#39;';
+            default:
+              return char;
+          }
+        });
+      }
+
+      function escapeAttribute(value) {
+        return escapeHtml(String(value));
+      }
+
+      function getVideoMimeType(url) {
+        if (!isNonEmptyString(url)) {
+          return 'video/mp4';
+        }
+        const cleaned = String(url).split(/[?#]/)[0].trim().toLowerCase();
+        if (cleaned.endsWith('.m3u8')) {
+          return 'application/x-mpegURL';
+        }
+        if (cleaned.endsWith('.mpd')) {
+          return 'application/dash+xml';
+        }
+        if (cleaned.endsWith('.webm')) {
+          return 'video/webm';
+        }
+        if (cleaned.endsWith('.ogv') || cleaned.endsWith('.ogg')) {
+          return 'video/ogg';
+        }
+        if (cleaned.endsWith('.mov') || cleaned.endsWith('.qt')) {
+          return 'video/quicktime';
+        }
+        if (cleaned.endsWith('.m4v')) {
+          return 'video/x-m4v';
+        }
+        return 'video/mp4';
+      }
+
+      function paintStars(container, value) {
+        if (!container) {
+          return;
+        }
+        const labels = Array.from(container.querySelectorAll('label'));
+        labels.forEach((label) => {
+          const starValue = Number(label.dataset.value);
+          if (value && starValue <= value) {
+            label.classList.add('active');
+          } else {
+            label.classList.remove('active');
+          }
+        });
+      }
+
+      function handleStarKeydown(event, inputs) {
+        if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.key)) {
+          return;
+        }
+        event.preventDefault();
+        const step = event.key === 'ArrowLeft' || event.key === 'ArrowDown' ? -1 : 1;
+        const list = Array.from(inputs);
+        let index = list.findIndex((input) => input === document.activeElement);
+        if (index === -1) {
+          index = list.findIndex((input) => input.checked);
+        }
+        if (index === -1) {
+          index = 0;
+        }
+        let targetIndex = index + step;
+        targetIndex = Math.min(Math.max(targetIndex, 0), list.length - 1);
+        const target = list[targetIndex];
+        if (target) {
+          target.checked = true;
+          target.focus();
+          target.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+      }
+
+      function createDataAdapter(uid) {
+        const queueKey = storageKeys.queue(uid);
+        let queue = [];
+        const queueListeners = [];
+        let onSent = () => {};
+        let onError = () => {};
+
+        loadQueue();
+
+        function loadQueue() {
+          const raw = localStorage.getItem(queueKey);
+          if (!raw) {
+            queue = [];
+            return;
+          }
+          try {
+            const parsed = JSON.parse(raw);
+            if (Array.isArray(parsed)) {
+              queue = parsed;
+            } else {
+              queue = [];
+            }
+          } catch (err) {
+            queue = [];
+          }
+        }
+
+        function persistQueue() {
+          try {
+            localStorage.setItem(queueKey, JSON.stringify(queue));
+          } catch (err) {
+            console.warn('Impossibile salvare la coda', err);
+          }
+          notifyQueueChange();
+        }
+
+        function notifyQueueChange() {
+          const snapshot = queue.slice();
+          queueListeners.forEach((listener) => listener(snapshot));
+        }
+
+        async function send(record) {
+          const response = await fetch(CONFIG.FORM_ENDPOINT, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Accept: 'application/json'
+            },
+            body: JSON.stringify(record),
+            keepalive: true
+          });
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+          }
+          let payload = {};
+          const text = await response.text();
+          if (text) {
+            try {
+              payload = JSON.parse(text);
+            } catch (err) {
+              console.warn('Impossibile analizzare la risposta del server come JSON', err);
+              payload = {};
+            }
+          }
+          if (payload && (payload.ok === false || payload.error)) {
+            throw new Error(payload.error || 'Errore del server');
+          }
+          if (payload && Object.prototype.hasOwnProperty.call(payload, 'success')) {
+            const success = payload.success;
+            const isPositive = success === true || success === 'true';
+            if (!isPositive) {
+              throw new Error(payload.message || 'Errore del server');
+            }
+          }
+          return payload;
+        }
+
+        function enqueue(record) {
+          queue.push(record);
+          persistQueue();
+        }
+
+        return {
+          postRecord: async (record) => {
+            if (!CONFIG || !CONFIG.FORM_ENDPOINT) {
+              onError('Il server per le risposte non è configurato. Riprova più tardi.');
+              enqueue(record);
+              return { ok: false, error: 'Endpoint del modulo mancante' };
+            }
+            try {
+              const response = await send(record);
+              onSent(record, response);
+              return { ok: true, response };
+            } catch (err) {
+              enqueue(record);
+              onError('Impossibile raggiungere il server delle risposte. Le risposte verranno sincronizzate automaticamente quando la connessione verrà ripristinata.');
+              return { ok: false, error: err instanceof Error ? err.message : String(err) };
+            }
+          },
+          flushQueue: async () => {
+            if (!CONFIG || !CONFIG.FORM_ENDPOINT) {
+              onError('Il server per le risposte non è configurato. Riprova più tardi.');
+              return false;
+            }
+            if (queue.length === 0) {
+              notifyQueueChange();
+              return true;
+            }
+            const remaining = [];
+            let allSent = true;
+            for (const record of queue) {
+              try {
+                const payload = await send(record);
+                onSent(record, payload);
+              } catch (err) {
+                remaining.push(record);
+                allSent = false;
+              }
+            }
+            queue = remaining;
+            persistQueue();
+            if (!allSent) {
+              onError('Alcune risposte sono ancora in sospeso. Il tentativo verrà ripetuto automaticamente.');
+            }
+            return allSent;
+          },
+          getQueue: () => queue.slice(),
+          onQueueChange: (listener) => {
+            queueListeners.push(listener);
+            listener(queue.slice());
+          },
+          setOnSent: (listener) => {
+            onSent = listener;
+          },
+          setOnError: (listener) => {
+            onError = listener;
+          },
+          discard: (submissionId) => {
+            if (!submissionId) {
+              return;
+            }
+            const initialLength = queue.length;
+            queue = queue.filter((item) => item.submission_id !== submissionId);
+            if (queue.length !== initialLength) {
+              persistQueue();
+            }
+          },
+          flushQueueWithBeacon: () => {
+            if (!CONFIG || !CONFIG.FORM_ENDPOINT || typeof navigator.sendBeacon !== 'function') {
+              return;
+            }
+            queue.forEach((record) => {
+              try {
+                const blob = new Blob([JSON.stringify(record)], { type: 'application/json' });
+                navigator.sendBeacon(CONFIG.FORM_ENDPOINT, blob);
+              } catch (err) {
+                /* ignore beacon failures */
+              }
+            });
+          }
+        };
+      }
+    })();
+  </script>
+</body>
+</html>
+
+
+
+
+

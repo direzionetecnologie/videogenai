@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Link personalizzati del questionario</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Geologica:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root { color-scheme: dark; }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; margin: 0; }
+    body {
+      font-family: 'Geologica', 'Inter', 'Segoe UI', system-ui, sans-serif;
+      background: #0b0b0f;
+      color: #e6e6f0;
+      padding: clamp(16px, 3vw, 32px);
+      line-height: 1.4;
+    }
+    h1 { font-size: clamp(20px, 3.4vw, 30px); margin: 0 0 4px; }
+    p { margin: 0 0 14px; color: #b9bed1; }
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 16px;
+    }
+    @media (min-width: 980px) {
+      .grid { grid-template-columns: 360px 1fr; align-items: start; }
+    }
+    .card {
+      background: linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.02));
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 14px;
+      padding: 16px;
+    }
+    label { display: block; font-weight: 600; margin-bottom: 8px; }
+    textarea, input[type="text"] {
+      width: 100%;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 10px;
+      padding: 10px 12px;
+      color: #e6e6f0;
+      outline: none;
+    }
+    textarea { min-height: 160px; resize: vertical; }
+    .controls { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 10px; }
+    button {
+      background: #4f46e5;
+      border: none;
+      color: white;
+      padding: 10px 14px;
+      border-radius: 10px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    button.secondary { background: #243; }
+    table { width: 100%; border-collapse: collapse; margin-top: 6px; }
+    th, td { padding: 10px 8px; border-bottom: 1px solid rgba(255,255,255,0.08); vertical-align: top; text-align: left; }
+    th { color: #cbd2e8; font-weight: 600; }
+    .muted { color: #98a1bd; font-size: 12px; }
+    .qr { width: 96px; height: 96px; }
+    .nowrap { white-space: nowrap; }
+    .row-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    .small { font-size: 12px; opacity: .9; }
+    .notice { background: rgba(79,70,229,.1); border: 1px solid rgba(79,70,229,.3); padding: 8px 10px; border-radius: 10px; }
+    .wrap { word-break: break-all; }
+  </style>
+  <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.1/build/qrcode.min.js"></script>
+</head>
+<body>
+  <h1>Link personalizzati del questionario</h1>
+  <p>Genera link con parametro uid per ogni partecipante. Il sito resta statico.</p>
+
+  <div class="grid">
+    <div class="card">
+      <label for="baseUrl">URL base del questionario</label>
+      <input id="baseUrl" type="text" placeholder="https://tuo-sito.github.io/repo/index.html">
+
+      <div style="height: 8px"></div>
+
+      <label for="csv">Elenco partecipanti</label>
+      <textarea id="csv" placeholder="CSV con intestazioni opzionali
+name,email,code
+Mario Rossi,mario.rossi@example.com,VAL-001
+Anna Bianchi,anna.bianchi@example.com,
+..."></textarea>
+
+      <div class="controls">
+        <button id="btnGenerate">Genera link</button>
+        <button id="btnSample" class="secondary">Carica esempio</button>
+        <button id="btnDownload" class="secondary" disabled>Scarica CSV</button>
+      </div>
+
+      <p class="muted">Se la colonna code è vuota il codice viene generato. Usa caratteri a-z 0-9 e trattino basso.</p>
+      <p class="muted">Consiglia di non inoltrare i link. Un codice per persona.</p>
+    </div>
+
+    <div class="card">
+      <div class="notice small">Colonne accettate name, email, code. Altre colonne vengono ignorate. Il file generato include anche la colonna link.</div>
+      <table id="table">
+        <thead>
+          <tr>
+            <th>Nome</th>
+            <th>Codice</th>
+            <th>Link</th>
+            <th class="nowrap">QR</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+
+  <script>
+    (function(){
+      'use strict';
+
+      function guessBaseUrl() {
+        try {
+          const u = new URL(window.location.href);
+          u.pathname = u.pathname.replace(/links\.html$/i, 'index.html');
+          return u.toString();
+        } catch(e) {
+          return '';
+        }
+      }
+
+      const baseUrlInput = document.getElementById('baseUrl');
+      baseUrlInput.value = guessBaseUrl();
+
+      const sample = `name,email,code
+Mario Rossi,mario.rossi@esempio.it,VAL-001
+Anna Bianchi,anna.bianchi@esempio.it,
+Paolo Verdi,,
+`;
+
+      document.getElementById('btnSample').addEventListener('click', function(){
+        document.getElementById('csv').value = sample;
+      });
+
+      document.getElementById('btnGenerate').addEventListener('click', function(){
+        const baseUrl = baseUrlInput.value.trim();
+        if (!isValidBaseUrl(baseUrl)) {
+          alert('Inserisci un URL base valido che punti a index.html');
+          return;
+        }
+        const rows = parseCSV(document.getElementById('csv').value.trim());
+        const enriched = rows.map(assignCode).map(r => ({
+          ...r,
+          link: buildLink(baseUrl, r.code)
+        }));
+        renderTable(enriched);
+        lastGenerated = enriched;
+        document.getElementById('btnDownload').disabled = enriched.length === 0;
+      });
+
+      function isValidBaseUrl(u) {
+        try {
+          const parsed = new URL(u);
+          return /index\.html$/i.test(parsed.pathname);
+        } catch(e) {
+          return false;
+        }
+      }
+
+      function parseCSV(text) {
+        if (!text) return [];
+        const lines = text.split(/\r?\n/).filter(Boolean);
+        if (lines.length === 0) return [];
+        let headers = [];
+        let start = 0;
+        if (lines[0].includes(',')) {
+          headers = lines[0].split(',').map(s => s.trim().toLowerCase());
+          start = 1;
+        } else {
+          headers = ['name'];
+        }
+        const idxName = headers.indexOf('name');
+        const idxEmail = headers.indexOf('email');
+        const idxCode = headers.indexOf('code');
+
+        const out = [];
+        for (let i = start; i < lines.length; i++) {
+          if (!lines[i].trim()) continue;
+          const cols = splitCSVLine(lines[i]);
+          const rec = {
+            name: idxName >= 0 ? (cols[idxName] || '').trim() : lines[i].trim(),
+            email: idxEmail >= 0 ? (cols[idxEmail] || '').trim() : '',
+            code: idxCode >= 0 ? (cols[idxCode] || '').trim() : ''
+          };
+          if (!rec.name && !rec.email && !rec.code) continue;
+          out.push(rec);
+        }
+        return out;
+      }
+
+      function splitCSVLine(line) {
+        const result = [];
+        let cur = '', inQuotes = false;
+        for (let i = 0; i < line.length; i++) {
+          const ch = line[i];
+          if (ch === '"') {
+            if (inQuotes && line[i+1] === '"') { cur += '"'; i++; }
+            else { inQuotes = !inQuotes; }
+          } else if (ch === ',' && !inQuotes) {
+            result.push(cur);
+            cur = '';
+          } else {
+            cur += ch;
+          }
+        }
+        result.push(cur);
+        return result;
+      }
+
+      function slugify(s) {
+        return String(s || '')
+          .toLowerCase()
+          .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+          .replace(/[^a-z0-9]+/g, '_')
+          .replace(/^_+|_+$/g, '');
+      }
+
+      function randomCode(len) {
+        const alphabet = 'abcdefghjkmnpqrstuvwxyz23456789';
+        let out = '';
+        const cryptoObj = window.crypto || window.msCrypto;
+        if (cryptoObj && cryptoObj.getRandomValues) {
+          const buf = new Uint32Array(len);
+          cryptoObj.getRandomValues(buf);
+          for (let i = 0; i < len; i++) {
+            out += alphabet[buf[i] % alphabet.length];
+          }
+        } else {
+          for (let i = 0; i < len; i++) {
+            out += alphabet[Math.floor(Math.random() * alphabet.length)];
+          }
+        }
+        return out;
+      }
+
+      function assignCode(rec, idx) {
+        if (rec.code && rec.code.trim()) {
+          return rec;
+        }
+        const base = slugify(rec.name || rec.email || 'user');
+        const suffix = randomCode(4);
+        return { ...rec, code: (base ? base : 'user') + '_' + suffix };
+      }
+
+      function buildLink(baseUrl, code) {
+        const u = new URL(baseUrl);
+        u.searchParams.set('uid', code);
+        return u.toString();
+      }
+
+      function clearTable() {
+        const tbody = document.querySelector('#table tbody');
+        while (tbody.firstChild) tbody.removeChild(tbody.firstChild);
+      }
+
+      function renderTable(rows) {
+        clearTable();
+        const tbody = document.querySelector('#table tbody');
+        rows.forEach((r, i) => {
+          const tr = document.createElement('tr');
+
+          const tdName = document.createElement('td');
+          tdName.textContent = r.name || '';
+          tr.appendChild(tdName);
+
+          const tdCode = document.createElement('td');
+          tdCode.textContent = r.code;
+          tr.appendChild(tdCode);
+
+          const tdLink = document.createElement('td');
+          const a = document.createElement('a');
+          a.href = r.link;
+          a.textContent = r.link;
+          a.className = 'wrap';
+          a.target = '_blank';
+          tdLink.appendChild(a);
+          tr.appendChild(tdLink);
+
+          const tdQr = document.createElement('td');
+          tdQr.className = 'nowrap';
+          const canvas = document.createElement('canvas');
+          canvas.className = 'qr';
+          tdQr.appendChild(canvas);
+          tr.appendChild(tdQr);
+
+          tbody.appendChild(tr);
+
+          if (window.QRCode && window.QRCode.toCanvas) {
+            window.QRCode.toCanvas(canvas, r.link, { width: 96 }, function(){ });
+          } else {
+            tdQr.textContent = 'QR non disponibile';
+          }
+        });
+      }
+
+      let lastGenerated = [];
+
+      function exportCSV(rows) {
+        if (!rows.length) return;
+        const headers = ['name','email','code','link'];
+        const data = [headers.join(',')].concat(
+          rows.map(r => [r.name || '', r.email || '', r.code || '', r.link || '']
+            .map(v => `"${String(v).replace(/"/g, '""')}"`).join(','))
+        ).join('\r\n');
+        const blob = new Blob([data], { type: 'text/csv;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'links.csv';
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(() => {
+          URL.revokeObjectURL(url);
+          a.remove();
+        }, 100);
+      }
+
+      document.getElementById('btnDownload').addEventListener('click', function(){
+        exportCSV(lastGenerated);
+      });
+    })();
+  </script>
+</body>
+</html>
