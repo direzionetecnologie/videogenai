@@ -5,15 +5,30 @@ window.CONFIG = {
   sections: [
     {
       title: 'Reply Bitmama',
-      videos: [
-        { title: 'La strage di Erba', file: 'Reply_Scena_Strage_Di_Erba.mov' }
+      contents: [
+        {
+          title: 'Ricostruzioni',
+          videos: [
+            { title: 'La strage di Erba', file: 'Reply_Scena_Strage_Di_Erba.mov' }
+          ]
+        }
       ]
     },
     {
       title: 'Bad Idea',
-      videos: [
-        { title: 'La strage di Erba', file: 'BadIdea_01 Scena Strage di Erba.mov' },
-        { title: "L'omicidio di Laura Ziliani", file: 'BadIdea_02 Scena Omicidio Laura Ziliani.mp4' }
+      contents: [
+        {
+          title: 'La strage di Erba',
+          videos: [
+            { title: 'La strage di Erba', file: 'BadIdea_01 Scena Strage di Erba.mov' }
+          ]
+        },
+        {
+          title: "L'omicidio di Laura Ziliani",
+          videos: [
+            { title: "L'omicidio di Laura Ziliani", file: 'BadIdea_02 Scena Omicidio Laura Ziliani.mp4' }
+          ]
+        }
       ]
     }
   ]
